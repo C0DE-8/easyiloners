@@ -2157,6 +2157,27 @@ h6 {
   max-width: 100%;
   height: auto;
 }
+.site-logo-text {
+  display: inline-block;
+  font-family: var(--easilon-font, "Montserrat", sans-serif);
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-transform: lowercase;
+}
+.site-logo-text--dark {
+  color: var(--easilon-black, #2B2B5E);
+}
+.site-logo-text--light {
+  color: var(--easilon-white, #ffffff);
+}
+@media (max-width: 425px) {
+  .site-logo-text {
+    font-size: 24px;
+  }
+}
 .main-header__right {
   display: flex;
   align-items: center;
