@@ -6,8 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "migrate": "node migrations/001_create_loan_applications.js",
-    "test": "node --check server.js && node --check app.js && node --check db.js && node --check diamond-sql.js && node --check routes/applyLoan.route.js && node --check services/telegram.js && node --check migrations/001_create_loan_applications.js"
+    "migrate": "node migrations/001_create_loan_applications.js && node migrations/002_create_telegram_authorized_chats.js",
+    "test": "node --check server.js && node --check app.js && node --check db.js && node --check diamond-sql.js && node --check routes/applyLoan.route.js && node --check services/telegram.js && node --check migrations/001_create_loan_applications.js && node --check migrations/002_create_telegram_authorized_chats.js"
   },
   "keywords": [],
   "author": "",
