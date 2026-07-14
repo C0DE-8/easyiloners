@@ -2,6 +2,12 @@
 
 ## Backend API
 
+Frontend API calls use `cli/assets/js/api.js` with this production base URL:
+
+```text
+https://easyiloners-4w68.vercel.app
+```
+
 Run from `backend/`:
 
 ```bash

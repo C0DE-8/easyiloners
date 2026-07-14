@@ -617,6 +617,8 @@
     <script src="assets/vendors/jquery-lettering/jquery.lettering.min.js"></script>
     <!-- template js -->
     <script src="assets/js/easilon.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="assets/js/api.js"></script>
     <script>
         (function () {
             var form = document.getElementById("loan-application-form");
@@ -654,22 +656,7 @@
                     message.textContent = "Submitting your loan application...";
                 }
 
-                fetch(form.action, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json"
-                    },
-                    body: JSON.stringify(payload)
-                })
-                    .then(function (response) {
-                        return response.json().then(function (data) {
-                            if (!response.ok) {
-                                throw new Error(data.error || "Unable to submit your loan application.");
-                            }
-
-                            return data;
-                        });
-                    })
+                window.easyilonersApi.submitLoanApplication(payload)
                     .then(function () {
                         form.reset();
                         if (window.jQuery && jQuery.fn.selectpicker) {
@@ -708,16 +695,7 @@
                     statusResult.textContent = "Checking your application status...";
                 }
 
-                fetch(statusForm.action + "?email=" + encodeURIComponent(email))
-                    .then(function (response) {
-                        return response.json().then(function (data) {
-                            if (!response.ok) {
-                                throw new Error(data.error || "Unable to check loan application status.");
-                            }
-
-                            return data;
-                        });
-                    })
+                window.easyilonersApi.getLoanStatus(email)
                     .then(function (data) {
                         if (!statusResult) {
                             return;
