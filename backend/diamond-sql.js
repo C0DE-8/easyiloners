@@ -66,6 +66,19 @@ function connectProject(siteId, options) {
   return {
     query,
     execute: query,
+    debug() {
+      return {
+        siteId: resolvedSiteId,
+        dbmsUrl,
+        timeoutMs,
+        apiKeyConfigured: Boolean(apiKey),
+        apiKeyLength: apiKey.length,
+        endpoints: {
+          query: `${dbmsUrl}/gateway/query`,
+          status: `${dbmsUrl}/gateway/status`
+        }
+      };
+    },
     status() {
       return request("/gateway/status", { method: "GET" });
     }

@@ -8,11 +8,13 @@ const app = express();
 app.use(express.json());
 
 app.get("/health", async (req, res) => {
+  const dbms = db.debug();
+
   try {
     const status = await db.status();
-    res.json({ ok: true, gateway: status });
+    res.json({ ok: true, gateway: status, dbms });
   } catch (error) {
-    res.status(503).json({ ok: false, error: error.message });
+    res.status(503).json({ ok: false, error: error.message, dbms });
   }
 });
 
