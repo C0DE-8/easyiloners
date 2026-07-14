@@ -7,6 +7,10 @@ const app = express();
 
 app.use(express.json());
 
+app.get("/", (req, res) => {
+  res.json({ ok: true, message: "easyiloners is working" });
+});
+
 app.get("/health", async (req, res) => {
   const dbms = db.debug();
 
