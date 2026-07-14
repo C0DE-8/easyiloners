@@ -108,8 +108,8 @@ Support managers reply in Telegram:
 ```text
 /chats
 /loans
-/reply CHAT_SESSION_ID your message
-/close CHAT_SESSION_ID
+Tap Pick on a chat, then send a normal Telegram message to reply.
+/close
 ```
 
 Closing a chat deletes that live chat session and its messages from the database.
@@ -130,6 +130,7 @@ After access is approved, the bot shows a manager menu with:
 - `✅ Check access` - confirm this chat is approved
 - `📄 View all loans` - show recent loan applications in Telegram
 - `💬 Open chats` - show waiting live chats
+- `🧹 Close active chat` - close the chat the manager picked
 - `📊 Loan stats` - show application count, manager chat count, and latest application
 - `ℹ️ Help` - show instructions
 
@@ -140,6 +141,7 @@ The same actions also work as commands:
 /access
 /loans
 /chats
+/close
 /stats
 /help
 ```

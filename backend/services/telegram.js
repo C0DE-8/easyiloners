@@ -11,6 +11,7 @@ const MENU_BUTTONS = {
   stats: "📊 Loan stats",
   loans: "📄 View all loans",
   chats: "💬 Open chats",
+  closeChat: "🧹 Close active chat",
   help: "ℹ️ Help"
 };
 
@@ -61,7 +62,7 @@ function getManagerKeyboard() {
     keyboard: [
       [{ text: MENU_BUTTONS.menu }, { text: MENU_BUTTONS.access }],
       [{ text: MENU_BUTTONS.loans }, { text: MENU_BUTTONS.chats }],
-      [{ text: MENU_BUTTONS.stats }],
+      [{ text: MENU_BUTTONS.closeChat }, { text: MENU_BUTTONS.stats }],
       [{ text: MENU_BUTTONS.help }]
     ],
     resize_keyboard: true,
@@ -87,10 +88,11 @@ function getMenuText(isAuthorized) {
     "📊 Loan stats - see application and manager counts",
     "📄 View all loans - show recent loan applications",
     "💬 Open chats - show waiting live chats",
+    "🧹 Close active chat - close the chat you picked",
     "ℹ️ Help - show bot instructions",
     "",
-    "Reply: /reply CHAT_ID your message",
-    "Close: /close CHAT_ID",
+    "After you pick a live chat, just send a normal message here to reply.",
+    "Use /close to close the active chat.",
     "",
     "New loan applications will be sent here automatically."
   ].join("\n");
@@ -248,6 +250,26 @@ async function getLiveChatById(sessionId) {
   return rows[0] || null;
 }
 
+async function getAssignedLiveChat(chatId) {
+  const rows = await db.query(
+    `SELECT
+      id,
+      name,
+      email,
+      status,
+      assigned_chat_id AS assignedChatId,
+      created_at AS createdAt
+    FROM live_chat_sessions
+    WHERE assigned_chat_id = ?
+      AND status = 'assigned'
+    ORDER BY updated_at DESC
+    LIMIT 1`,
+    [String(chatId)]
+  );
+
+  return rows[0] || null;
+}
+
 async function getLiveChatMessageCount(sessionId) {
   const rows = await db.query("SELECT COUNT(*) AS count FROM live_chat_messages WHERE session_id = ?", [sessionId]);
   return Number(rows[0] && rows[0].count ? rows[0].count : 0);
@@ -388,7 +410,7 @@ async function sendOpenLiveChats(chatId) {
         `Status: ${chat.status}`,
         `Messages: ${count}`,
         "",
-        `Reply: /reply ${chat.id} your message`,
+        "Tap Pick, then type a normal message here to reply.",
         `Close: /close ${chat.id}`
       ].join("\n"),
       { reply_markup: buildLiveChatKeyboard(chat.id) }
@@ -411,7 +433,7 @@ async function notifyLiveChatStarted(session, queuePosition) {
       `Name: ${session.name}`,
       `Email: ${session.email}`,
       "",
-      `Reply: /reply ${session.id} your message`,
+      "Tap Pick, then type a normal message here to reply.",
       `Close: /close ${session.id}`
     ].join("\n"),
     { reply_markup: buildLiveChatKeyboard(session.id) }
@@ -428,7 +450,7 @@ async function notifyLiveChatMessage(session, message) {
       "",
       message,
       "",
-      `Reply: /reply ${session.id} your message`,
+      "Tap Pick, then type a normal message here to reply.",
       `Close: /close ${session.id}`
     ].join("\n"),
     { reply_markup: buildLiveChatKeyboard(session.id) }
@@ -457,7 +479,13 @@ async function handleLiveChatCallback(callbackQuery) {
     await answerCallbackQuery(callbackQuery.id, "Chat picked");
     await sendTelegramMessage(
       chatId,
-      [`✅ You picked chat ${shortChatId(sessionId)}.`, `Reply: /reply ${sessionId} your message`].join("\n"),
+      [
+        `✅ You picked chat ${shortChatId(sessionId)}.`,
+        `Customer: ${session.name}`,
+        "",
+        "Now just type a normal message here and it will be sent to the customer.",
+        "Use /close or tap 🧹 Close active chat when finished."
+      ].join("\n"),
       { reply_markup: getManagerKeyboard() }
     );
     return;
@@ -480,6 +508,23 @@ async function handleLiveChatCommand(chatId, text) {
 
   if (text === MENU_BUTTONS.chats || text === "/chats") {
     await sendOpenLiveChats(chatId);
+    return true;
+  }
+
+  if (text === MENU_BUTTONS.closeChat || text === "/close") {
+    const session = await getAssignedLiveChat(chatId);
+
+    if (!session) {
+      await sendTelegramMessage(chatId, "No active picked chat. Tap 💬 Open chats, then pick a chat first.", {
+        reply_markup: getManagerKeyboard()
+      });
+      return true;
+    }
+
+    await closeLiveChat(session.id);
+    await sendTelegramMessage(chatId, `🧹 Chat ${shortChatId(session.id)} closed and cleared.`, {
+      reply_markup: getManagerKeyboard()
+    });
     return true;
   }
 
@@ -512,6 +557,16 @@ async function handleLiveChatCommand(chatId, text) {
     await closeLiveChat(sessionId);
     await sendTelegramMessage(chatId, `🧹 Chat ${shortChatId(sessionId)} closed and cleared.`, { reply_markup: getManagerKeyboard() });
     return true;
+  }
+
+  if (text && !text.startsWith("/")) {
+    const session = await getAssignedLiveChat(chatId);
+
+    if (session) {
+      await saveSupportReply(session.id, text);
+      await sendTelegramMessage(chatId, `✅ Sent to ${session.name}.`, { reply_markup: getManagerKeyboard() });
+      return true;
+    }
   }
 
   return false;
