@@ -60,8 +60,9 @@ curl -X POST http://localhost:3000/api/apply-loan \
     "pinCode": "19020",
     "employmentIndustry": "Retail",
     "employerName": "Sample Store",
-    "employerStatus": "Full-time",
-    "workPhoneNumber": "(206) 342-8631"
+    "employerStatus": "working",
+    "workPhoneCountryCode": "+1",
+    "workPhoneNumber": "5550100"
   }'
 ```
 

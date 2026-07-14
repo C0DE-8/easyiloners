@@ -365,33 +365,43 @@
                         <div class="apply-loan__form__row row">
                             <div class="col-md-6">
                                 <div class="apply-loan__form__control">
-                                    <label for="employment-industry">Employment Industry*</label>
+                                    <label for="employment-industry">Employment Industry if working</label>
                                     <input type="text" id="employment-industry" name="employmentIndustry" placeholder="Employment Industry" required="">
                                 </div><!-- /.pply-loan__form__control -->
                             </div>
                             <div class="col-md-6">
                                 <div class="apply-loan__form__control">
-                                    <label for="employer-name">Employer Name*</label>
+                                    <label for="employer-name">Employer Name if working</label>
                                     <input type="text" id="employer-name" name="employerName" placeholder="Employer Name" required="">
                                 </div><!-- /.pply-loan__form__control -->
                             </div>
                             <div class="col-md-6">
                                 <div class="apply-loan__form__control">
                                     <label for="employer-status">Employer Status*</label>
-                                    <input type="text" id="employer-status" name="employerStatus" placeholder="Employer Status" required="">
+                                    <select class="selectpicker" id="employer-status" name="employerStatus" aria-label="Employer Status" required="">
+                                        <option value="" selected="">Employer Status</option>
+                                        <option value="working">Working</option>
+                                        <option value="not working">Not working</option>
+                                    </select>
                                 </div><!-- /.pply-loan__form__control -->
                             </div>
                             <div class="col-md-6">
                                 <div class="apply-loan__form__control">
-                                    <label>Work Phone Number*</label>
-                                    <select class="selectpicker" name="workPhoneNumber" aria-label="Work Phone Number" required="">
-                                        <option value="" selected="">Work Phone Number</option>
-                                        <option value="(206) 342-8631">(206) 342-8631</option>
-                                        <option value="(717) 550-1675">(717) 550-1675</option>
-                                        <option value="(248) 762-0356">(248) 762-0356</option>
-                                        <option value="(252) 258-3799">(252) 258-3799</option>
-                                        <option value="(209) 300-2557">(209) 300-2557</option>
-                                    </select>
+                                    <label>Work Phone Number if working</label>
+                                    <div class="row gutter-y-10">
+                                        <div class="col-5">
+                                            <select class="selectpicker" id="work-phone-country-code" name="workPhoneCountryCode" aria-label="Work Phone Country Code" required="">
+                                                <option value="+1" selected="">US +1</option>
+                                                <option value="+44">UK +44</option>
+                                                <option value="+880">BD +880</option>
+                                                <option value="+91">IN +91</option>
+                                                <option value="+971">AE +971</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-7">
+                                            <input type="tel" id="work-phone-number" name="workPhoneNumber" placeholder="Work Phone Number" required="">
+                                        </div>
+                                    </div>
                                 </div><!-- /.pply-loan__form__control -->
                             </div>
                         </div><!-- /.pply-loan__form -->
@@ -637,8 +647,33 @@
                     .replace(/'/g, "&#039;");
             }
 
+            var employerStatus = document.getElementById("employer-status");
+            var employmentIndustry = document.getElementById("employment-industry");
+            var employerName = document.getElementById("employer-name");
+            var workPhoneCountryCode = document.getElementById("work-phone-country-code");
+            var workPhoneNumber = document.getElementById("work-phone-number");
+
+            function updateEmployerRequirements() {
+                var isWorking = employerStatus && employerStatus.value === "working";
+                var employerFields = [employmentIndustry, employerName, workPhoneCountryCode, workPhoneNumber];
+
+                employerFields.forEach(function (field) {
+                    if (!field) {
+                        return;
+                    }
+
+                    field.required = isWorking;
+                });
+            }
+
+            if (employerStatus) {
+                employerStatus.addEventListener("change", updateEmployerRequirements);
+                updateEmployerRequirements();
+            }
+
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
+                updateEmployerRequirements();
 
                 var submitButton = form.querySelector("button[type='submit']");
                 var formData = new FormData(form);

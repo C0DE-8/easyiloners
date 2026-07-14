@@ -27,6 +27,7 @@ const FIELDS = [
   "employmentIndustry",
   "employerName",
   "employerStatus",
+  "workPhoneCountryCode",
   "workPhoneNumber"
 ];
 
@@ -41,11 +42,24 @@ const REQUIRED_FIELDS = [
 ];
 
 function normalizeApplication(body) {
-  return FIELDS.reduce((application, field) => {
+  const application = FIELDS.reduce((normalized, field) => {
     const value = body[field];
-    application[field] = typeof value === "string" ? value.trim() : value || "";
-    return application;
+    normalized[field] = typeof value === "string" ? value.trim() : value || "";
+    return normalized;
   }, {});
+
+  if (application.employerStatus === "not working") {
+    application.employmentIndustry = "";
+    application.employerName = "";
+    application.workPhoneNumber = "";
+    return application;
+  }
+
+  if (application.workPhoneCountryCode && application.workPhoneNumber) {
+    application.workPhoneNumber = `${application.workPhoneCountryCode} ${application.workPhoneNumber}`;
+  }
+
+  return application;
 }
 
 function validateApplication(application) {
