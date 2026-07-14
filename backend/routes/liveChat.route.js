@@ -16,6 +16,15 @@ async function getOpenChatCount() {
   return Number(rows[0] && rows[0].count ? rows[0].count : 0);
 }
 
+async function getOpenChatCountBefore(createdAt) {
+  const rows = await db.query(
+    "SELECT COUNT(*) AS count FROM live_chat_sessions WHERE status IN ('open', 'assigned') AND created_at < ?",
+    [createdAt]
+  );
+
+  return Number(rows[0] && rows[0].count ? rows[0].count : 0);
+}
+
 async function getSession(sessionId) {
   const rows = await db.query(
     `SELECT
@@ -30,6 +39,27 @@ async function getSession(sessionId) {
     WHERE id = ?
     LIMIT 1`,
     [sessionId]
+  );
+
+  return rows[0] || null;
+}
+
+async function getOpenSessionByEmail(email) {
+  const rows = await db.query(
+    `SELECT
+      id,
+      name,
+      email,
+      status,
+      assigned_chat_id AS assignedChatId,
+      created_at AS createdAt,
+      updated_at AS updatedAt
+    FROM live_chat_sessions
+    WHERE LOWER(email) = LOWER(?)
+      AND status IN ('open', 'assigned')
+    ORDER BY created_at DESC
+    LIMIT 1`,
+    [email]
   );
 
   return rows[0] || null;
@@ -55,6 +85,24 @@ router.post("/start", async (req, res) => {
 
   if (!name || !email) {
     return res.status(400).json({ ok: false, error: "Name and email are required" });
+  }
+
+  const existingSession = await getOpenSessionByEmail(email);
+
+  if (existingSession) {
+    const waitingBefore = await getOpenChatCountBefore(existingSession.createdAt);
+
+    return res.json({
+      ok: true,
+      reused: true,
+      session: existingSession,
+      queuePosition: waitingBefore + 1,
+      message: existingSession.status === "assigned"
+        ? "Your live chat is already open with support. We reopened it for you."
+        : waitingBefore > 0
+          ? `Your live chat is still open. There are ${waitingBefore} open chat(s) ahead of you. You are number ${waitingBefore + 1}.`
+          : "Your live chat is still open. We reopened it for you."
+    });
   }
 
   const waitingBefore = await getOpenChatCount();
