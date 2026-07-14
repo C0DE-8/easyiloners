@@ -389,7 +389,7 @@
                             <i class="icon-double-right-arrow"></i>
                         </span>
                     </button><!-- /.apply-loan__form__btn easilon-btn -->
-                    <p class="apply-loan__form__message" aria-live="polite"></p>
+                    <div class="apply-loan__form__message" aria-live="polite"></div>
                 </form><!-- /.apply-loan__form -->
             </div><!-- /.container -->
         </section><!-- /.apply-loan section-space -->
@@ -415,6 +415,13 @@
                                 </button>
                             </div>
                         </div>
+                        <button type="button" class="apply-loan__form__btn easilon-btn" id="view-all-loans-btn">
+                            <span>view all loans</span>
+                            <span class="easilon-btn__icon">
+                                <i class="icon-double-right-arrow"></i>
+                            </span>
+                        </button>
+                        <div class="apply-loan__status-alert" aria-live="polite"></div>
                         <div class="apply-loan__status-result" aria-live="polite"></div>
                     </div>
                 </form>
@@ -615,6 +622,15 @@
                 return;
             }
 
+            function showFormAlert(messageText, type) {
+                if (!message) {
+                    return;
+                }
+
+                message.className = "apply-loan__form__message alert alert-" + (type || "info");
+                message.textContent = messageText;
+            }
+
             function escapeHtml(value) {
                 return String(value || "")
                     .replace(/&/g, "&amp;")
@@ -664,9 +680,7 @@
                     submitButton.disabled = true;
                 }
 
-                if (message) {
-                    message.textContent = "Submitting your loan application...";
-                }
+                showFormAlert("Submitting your loan application...", "info");
 
                 window.easyilonersApi.submitLoanApplication(payload)
                     .then(function () {
@@ -674,14 +688,10 @@
                         if (window.jQuery && jQuery.fn.selectpicker) {
                             jQuery(".selectpicker").selectpicker("refresh");
                         }
-                        if (message) {
-                            message.textContent = "Your loan application has been submitted.";
-                        }
+                        showFormAlert("Your loan application has been submitted.", "success");
                     })
                     .catch(function (error) {
-                        if (message) {
-                            message.textContent = error.message;
-                        }
+                        showFormAlert(error.message, "danger");
                     })
                     .finally(function () {
                         if (submitButton) {
@@ -692,9 +702,64 @@
 
             var statusForm = document.getElementById("loan-status-form");
             var statusResult = statusForm ? statusForm.querySelector(".apply-loan__status-result") : null;
+            var statusAlert = statusForm ? statusForm.querySelector(".apply-loan__status-alert") : null;
+            var viewAllLoansButton = document.getElementById("view-all-loans-btn");
 
             if (!statusForm) {
                 return;
+            }
+
+            function showStatusAlert(messageText, type) {
+                if (!statusAlert) {
+                    return;
+                }
+
+                statusAlert.className = "apply-loan__status-alert alert alert-" + (type || "info");
+                statusAlert.textContent = messageText;
+            }
+
+            function formatDate(value) {
+                if (!value) {
+                    return "Not available";
+                }
+
+                var date = new Date(value);
+
+                if (Number.isNaN(date.getTime())) {
+                    return value;
+                }
+
+                return date.toLocaleString(undefined, {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit"
+                });
+            }
+
+            function renderApplications(applications, emptyMessage) {
+                if (!statusResult) {
+                    return;
+                }
+
+                if (!applications || applications.length === 0) {
+                    statusResult.textContent = emptyMessage;
+                    return;
+                }
+
+                statusResult.innerHTML = applications.map(function (application) {
+                    return [
+                        "<div>",
+                        "<strong>Status:</strong> " + escapeHtml(application.status),
+                        "<br><strong>Name:</strong> " + escapeHtml(application.fullName),
+                        "<br><strong>Email:</strong> " + escapeHtml(application.email),
+                        "<br><strong>Loan:</strong> " + escapeHtml(application.loanPurpose) + " for " + escapeHtml(application.loanAmount),
+                        application.message ? "<br><strong>Update:</strong> " + escapeHtml(application.message) : "",
+                        "<br><strong>Submitted:</strong> " + escapeHtml(formatDate(application.submittedAt)),
+                        "</div>"
+                    ].join("");
+                }).join("<hr>");
             }
 
             statusForm.addEventListener("submit", function (event) {
@@ -703,38 +768,32 @@
                 var emailInput = statusForm.querySelector("input[name='email']");
                 var email = emailInput ? emailInput.value.trim() : "";
 
-                if (statusResult) {
-                    statusResult.textContent = "Checking your application status...";
-                }
+                showStatusAlert("Checking your application status...", "info");
 
                 window.easyilonersApi.getLoanStatus(email)
                     .then(function (data) {
-                        if (!statusResult) {
-                            return;
-                        }
-
-                        if (!data.applications || data.applications.length === 0) {
-                            statusResult.textContent = "No application was found for that email.";
-                            return;
-                        }
-
-                        statusResult.innerHTML = data.applications.map(function (application) {
-                            return [
-                                "<div>",
-                                "<strong>Status:</strong> " + escapeHtml(application.status),
-                                "<br><strong>Loan:</strong> " + escapeHtml(application.loanPurpose) + " for " + escapeHtml(application.loanAmount),
-                                application.message ? "<br><strong>Update:</strong> " + escapeHtml(application.message) : "",
-                                "<br><strong>Submitted:</strong> " + escapeHtml(application.submittedAt),
-                                "</div>"
-                            ].join("");
-                        }).join("<hr>");
+                        showStatusAlert("Loan status loaded.", "success");
+                        renderApplications(data.applications, "No application was found for that email.");
                     })
                     .catch(function (error) {
-                        if (statusResult) {
-                            statusResult.textContent = error.message;
-                        }
+                        showStatusAlert(error.message, "danger");
                     });
             });
+
+            if (viewAllLoansButton) {
+                viewAllLoansButton.addEventListener("click", function () {
+                    showStatusAlert("Loading recent loan applications...", "info");
+
+                    window.easyilonersApi.getAllLoans()
+                        .then(function (data) {
+                            showStatusAlert("Recent loan applications loaded.", "success");
+                            renderApplications(data.applications, "No loan applications found.");
+                        })
+                        .catch(function (error) {
+                            showStatusAlert(error.message, "danger");
+                        });
+                });
+            }
         })();
     </script>
 </body>

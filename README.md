@@ -74,6 +74,14 @@ curl -X POST http://localhost:3000/api/apply-loan \
 curl "http://localhost:3000/api/apply-loan/status?email=jane@example.com"
 ```
 
+### View Recent Loans
+
+`GET /api/apply-loan/all?limit=25`
+
+```bash
+curl "http://localhost:3000/api/apply-loan/all?limit=25"
+```
+
 ### Telegram Bot Access
 
 Start the backend, open the Telegram bot, send `/start`, then send:

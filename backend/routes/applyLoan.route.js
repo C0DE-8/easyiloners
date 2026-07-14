@@ -66,6 +66,41 @@ function validateApplication(application) {
   return REQUIRED_FIELDS.filter((field) => !application[field]);
 }
 
+function selectLoanApplications(whereClause, params, limit) {
+  return db.query(
+    `SELECT
+      id,
+      loan_amount AS loanAmount,
+      monthly_income AS monthlyIncome,
+      loan_purpose AS loanPurpose,
+      loan_years AS loanYears,
+      full_name AS fullName,
+      email,
+      mobile_number AS mobileNumber,
+      city,
+      state,
+      country,
+      employer_status AS employerStatus,
+      application_status AS status,
+      status_message AS message,
+      created_at AS submittedAt,
+      updated_at AS updatedAt
+    FROM loan_applications
+    ${whereClause}
+    ORDER BY created_at DESC
+    LIMIT ?`,
+    [...params, limit]
+  );
+}
+
+// Recent loan applications list for the page "View all loans" button.
+router.get("/all", async (req, res) => {
+  const limit = Math.min(Math.max(Number(req.query.limit || 25), 1), 100);
+  const rows = await selectLoanApplications("", [], limit);
+
+  res.json({ ok: true, applications: rows });
+});
+
 // Public status lookup used by borrowers on apply-loan.html.
 router.get("/status", async (req, res) => {
   const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
@@ -74,24 +109,7 @@ router.get("/status", async (req, res) => {
     return res.status(400).json({ ok: false, error: "Email is required" });
   }
 
-  const rows = await db.query(
-    `SELECT
-      id,
-      loan_amount AS loanAmount,
-      loan_purpose AS loanPurpose,
-      loan_years AS loanYears,
-      full_name AS fullName,
-      email,
-      application_status AS status,
-      status_message AS message,
-      created_at AS submittedAt,
-      updated_at AS updatedAt
-    FROM loan_applications
-    WHERE LOWER(email) = LOWER(?)
-    ORDER BY created_at DESC
-    LIMIT 5`,
-    [email]
-  );
+  const rows = await selectLoanApplications("WHERE LOWER(email) = LOWER(?)", [email], 5);
 
   res.json({ ok: true, applications: rows });
 });

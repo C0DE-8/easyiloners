@@ -33,6 +33,15 @@
       }).catch(function (error) {
         throw new Error(getErrorMessage(error, "Unable to check loan application status."));
       });
+    },
+    getAllLoans: function () {
+      return api.get("/api/apply-loan/all", {
+        params: { limit: 25 }
+      }).then(function (response) {
+        return response.data;
+      }).catch(function (error) {
+        throw new Error(getErrorMessage(error, "Unable to load loan applications."));
+      });
     }
   };
 })(window);
