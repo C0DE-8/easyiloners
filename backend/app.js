@@ -1,11 +1,14 @@
 "use strict";
 
 const express = require("express");
+const helmet = require("helmet");
 const db = require("./db");
 const applyLoanRouter = require("./routes/applyLoan.route");
+const telegramRouter = require("./routes/telegram.route");
 
 const app = express();
 
+app.use(helmet());
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
@@ -37,5 +40,6 @@ app.get("/health", async (req, res) => {
 });
 
 app.use("/api/apply-loan", applyLoanRouter);
+app.use("/api/telegram", telegramRouter);
 
 module.exports = app;

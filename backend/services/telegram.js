@@ -38,6 +38,15 @@ function getAccessPassword() {
   return process.env.TELEGRAM_ACCESS_PASSWORD || DEFAULT_ACCESS_PASSWORD;
 }
 
+function stopTelegramBot() {
+  if (!pollTimer) {
+    return;
+  }
+
+  clearInterval(pollTimer);
+  pollTimer = null;
+}
+
 async function telegramRequest(method, payload) {
   const token = getBotToken();
 
@@ -98,6 +107,11 @@ async function getAuthorizedChats() {
   return db.query("SELECT chat_id FROM telegram_authorized_chats ORDER BY authorized_at ASC");
 }
 
+async function getAuthorizedChatCount() {
+  const rows = await db.query("SELECT COUNT(*) AS count FROM telegram_authorized_chats");
+  return Number(rows[0] && rows[0].count ? rows[0].count : 0);
+}
+
 async function handleTelegramUpdate(update) {
   const message = update.message || update.edited_message;
 
@@ -127,6 +141,35 @@ async function handleTelegramUpdate(update) {
   await sendTelegramMessage(chat.id, "Invalid password.");
 }
 
+async function setTelegramWebhook(url) {
+  if (!url) {
+    throw new Error("Webhook URL is required");
+  }
+
+  const payload = {
+    url,
+    allowed_updates: ["message", "edited_message"]
+  };
+
+  if (process.env.TELEGRAM_WEBHOOK_SECRET) {
+    payload.secret_token = process.env.TELEGRAM_WEBHOOK_SECRET;
+  }
+
+  const result = await telegramRequest("setWebhook", payload);
+  stopTelegramBot();
+  return result;
+}
+
+async function deleteTelegramWebhook() {
+  return telegramRequest("deleteWebhook", {
+    drop_pending_updates: process.env.TELEGRAM_DROP_PENDING_UPDATES === "true"
+  });
+}
+
+async function getTelegramWebhookInfo() {
+  return telegramRequest("getWebhookInfo");
+}
+
 async function pollTelegramUpdates() {
   const token = process.env.TELEGRAM_BOT_TOKEN || process.env.BOT;
 
@@ -151,6 +194,11 @@ function startTelegramBot() {
     return;
   }
 
+  if (process.env.TELEGRAM_USE_WEBHOOK === "true" || process.env.TELEGRAM_WEBHOOK_URL) {
+    console.log("Telegram polling disabled: webhook mode is configured");
+    return;
+  }
+
   if (!getBotToken()) {
     console.log("Telegram bot disabled: TELEGRAM_BOT_TOKEN is not configured");
     return;
@@ -169,6 +217,32 @@ function startTelegramBot() {
   });
 
   console.log("Telegram bot polling started");
+}
+
+async function getTelegramDebug() {
+  const token = getBotToken();
+  let webhook = null;
+  let webhookError = null;
+
+  try {
+    webhook = token ? await getTelegramWebhookInfo() : null;
+  } catch (error) {
+    webhookError = error.message;
+  }
+
+  return {
+    tokenConfigured: Boolean(token),
+    tokenLength: token ? token.length : 0,
+    passwordConfigured: Boolean(getAccessPassword()),
+    pollingEnabled: Boolean(pollTimer),
+    webhookModeConfigured: process.env.TELEGRAM_USE_WEBHOOK === "true" || Boolean(process.env.TELEGRAM_WEBHOOK_URL),
+    webhookUrlConfigured: Boolean(process.env.TELEGRAM_WEBHOOK_URL),
+    webhookSecretConfigured: Boolean(process.env.TELEGRAM_WEBHOOK_SECRET),
+    pollIntervalMs: Number(process.env.TELEGRAM_POLL_INTERVAL_MS || 5000),
+    authorizedChatCount: await getAuthorizedChatCount(),
+    webhook,
+    webhookError
+  };
 }
 
 async function sendLoanApplication(application) {
@@ -203,7 +277,12 @@ async function sendLoanApplication(application) {
 }
 
 module.exports = {
+  deleteTelegramWebhook,
+  getTelegramDebug,
+  getTelegramWebhookInfo,
   handleTelegramUpdate,
   sendLoanApplication,
+  setTelegramWebhook,
+  stopTelegramBot,
   startTelegramBot
 };
