@@ -4,6 +4,12 @@ const axios = require("axios");
 const db = require("../db");
 
 const DEFAULT_ACCESS_PASSWORD = "123456";
+const MENU_BUTTONS = {
+  menu: "📋 Menu",
+  access: "✅ Check access",
+  stats: "📊 Loan stats",
+  help: "ℹ️ Help"
+};
 
 let pollTimer = null;
 let updateOffset = 0;
@@ -47,6 +53,39 @@ function stopTelegramBot() {
   pollTimer = null;
 }
 
+function getManagerKeyboard() {
+  return {
+    keyboard: [
+      [{ text: MENU_BUTTONS.menu }, { text: MENU_BUTTONS.access }],
+      [{ text: MENU_BUTTONS.stats }, { text: MENU_BUTTONS.help }]
+    ],
+    resize_keyboard: true,
+    one_time_keyboard: false,
+    input_field_placeholder: "Choose a manager action"
+  };
+}
+
+function getMenuText(isAuthorized) {
+  if (!isAuthorized) {
+    return [
+      "👋 Welcome to easyiloners manager bot.",
+      "Send the access password to receive loan application alerts.",
+      "",
+      "Default password: 123456"
+    ].join("\n");
+  }
+
+  return [
+    "📋 easyiloners manager menu",
+    "",
+    "✅ Check access - confirm this chat is approved",
+    "📊 Loan stats - see application and manager counts",
+    "ℹ️ Help - show bot instructions",
+    "",
+    "New loan applications will be sent here automatically."
+  ].join("\n");
+}
+
 async function telegramRequest(method, payload) {
   const token = getBotToken();
 
@@ -65,11 +104,12 @@ async function telegramRequest(method, payload) {
   return response.data.result;
 }
 
-async function sendTelegramMessage(chatId, text) {
+async function sendTelegramMessage(chatId, text, options) {
   return telegramRequest("sendMessage", {
     chat_id: chatId,
     text,
-    disable_web_page_preview: true
+    disable_web_page_preview: true,
+    ...(options || {})
   });
 }
 
@@ -112,6 +152,66 @@ async function getAuthorizedChatCount() {
   return Number(rows[0] && rows[0].count ? rows[0].count : 0);
 }
 
+async function getLoanApplicationCount() {
+  const rows = await db.query("SELECT COUNT(*) AS count FROM loan_applications");
+  return Number(rows[0] && rows[0].count ? rows[0].count : 0);
+}
+
+async function getLatestLoanApplication() {
+  const rows = await db.query(
+    `SELECT
+      full_name AS fullName,
+      email,
+      loan_amount AS loanAmount,
+      loan_purpose AS loanPurpose,
+      application_status AS status,
+      created_at AS submittedAt
+    FROM loan_applications
+    ORDER BY created_at DESC
+    LIMIT 1`
+  );
+
+  return rows[0] || null;
+}
+
+async function sendManagerMenu(chatId, isAuthorized) {
+  await sendTelegramMessage(chatId, getMenuText(isAuthorized), {
+    reply_markup: getManagerKeyboard()
+  });
+}
+
+async function sendManagerStats(chatId) {
+  const [authorizedChatCount, loanApplicationCount, latestApplication] = await Promise.all([
+    getAuthorizedChatCount(),
+    getLoanApplicationCount(),
+    getLatestLoanApplication()
+  ]);
+
+  const latestText = latestApplication
+    ? [
+        "",
+        "Latest application:",
+        `Name: ${latestApplication.fullName}`,
+        `Email: ${latestApplication.email}`,
+        `Loan: ${latestApplication.loanPurpose} for ${latestApplication.loanAmount}`,
+        `Status: ${latestApplication.status}`,
+        `Submitted: ${latestApplication.submittedAt}`
+      ].join("\n")
+    : "\nLatest application: none yet";
+
+  await sendTelegramMessage(
+    chatId,
+    [
+      "📊 easyiloners loan stats",
+      "",
+      `Loan applications: ${loanApplicationCount}`,
+      `Approved manager chats: ${authorizedChatCount}`,
+      latestText
+    ].join("\n"),
+    { reply_markup: getManagerKeyboard() }
+  );
+}
+
 async function handleTelegramUpdate(update) {
   const message = update.message || update.edited_message;
 
@@ -122,23 +222,60 @@ async function handleTelegramUpdate(update) {
   const chat = message.chat;
   const text = typeof message.text === "string" ? message.text.trim() : "";
 
-  if (!text || text === "/start") {
-    await sendTelegramMessage(chat.id, "Send the access password to receive loan application alerts.");
+  const authorized = await isAuthorizedChat(chat.id);
+
+  if (!text || text === "/start" || text === "/menu" || text === MENU_BUTTONS.menu) {
+    await sendManagerMenu(chat.id, authorized);
     return;
   }
 
   if (text === getAccessPassword()) {
     await saveAuthorizedChat(chat);
-    await sendTelegramMessage(chat.id, "Access approved. You will receive new loan application alerts here.");
+    await sendTelegramMessage(chat.id, "✅ Access approved. You will receive new loan application alerts here.", {
+      reply_markup: getManagerKeyboard()
+    });
+    await sendManagerMenu(chat.id, true);
     return;
   }
 
-  if (await isAuthorizedChat(chat.id)) {
-    await sendTelegramMessage(chat.id, "You are already approved for loan application alerts.");
+  if (text === MENU_BUTTONS.access || text === "/access") {
+    await sendTelegramMessage(
+      chat.id,
+      authorized ? "✅ This chat is approved for loan alerts." : "🔒 This chat is not approved yet. Send the access password.",
+      { reply_markup: getManagerKeyboard() }
+    );
     return;
   }
 
-  await sendTelegramMessage(chat.id, "Invalid password.");
+  if (text === MENU_BUTTONS.help || text === "/help") {
+    await sendTelegramMessage(chat.id, getMenuText(authorized), {
+      reply_markup: getManagerKeyboard()
+    });
+    return;
+  }
+
+  if (text === MENU_BUTTONS.stats || text === "/stats") {
+    if (!authorized) {
+      await sendTelegramMessage(chat.id, "🔒 Send the access password before viewing loan stats.", {
+        reply_markup: getManagerKeyboard()
+      });
+      return;
+    }
+
+    await sendManagerStats(chat.id);
+    return;
+  }
+
+  if (authorized) {
+    await sendTelegramMessage(chat.id, "📋 Choose an action from the manager menu.", {
+      reply_markup: getManagerKeyboard()
+    });
+    return;
+  }
+
+  await sendTelegramMessage(chat.id, "❌ Invalid password. Send the access password or tap 📋 Menu.", {
+    reply_markup: getManagerKeyboard()
+  });
 }
 
 async function setTelegramWebhook(url) {

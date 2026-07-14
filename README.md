@@ -77,6 +77,22 @@ Start the backend, open the Telegram bot, send `/start`, then send:
 
 That chat will be saved in `telegram_authorized_chats` and will receive loan application alerts.
 
+After access is approved, the bot shows a manager menu with:
+
+- `📋 Menu` - show manager actions
+- `✅ Check access` - confirm this chat is approved
+- `📊 Loan stats` - show application count, manager chat count, and latest application
+- `ℹ️ Help` - show instructions
+
+The same actions also work as commands:
+
+```text
+/menu
+/access
+/stats
+/help
+```
+
 ### Telegram Debug
 
 If `TELEGRAM_ADMIN_KEY` is set:
