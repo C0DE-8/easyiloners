@@ -407,6 +407,33 @@
             </div><!-- /.container -->
         </section><!-- /.apply-loan section-space -->
 
+        <section class="apply-loan section-space-bottom">
+            <div class="container">
+                <form action="/api/apply-loan/status" method="get" class="apply-loan__form" id="loan-status-form">
+                    <div class="apply-loan__details">
+                        <h2 class="apply-loan__details__title">Check Loan Application Status</h2>
+                        <div class="apply-loan__form__row row">
+                            <div class="col-md-8">
+                                <div class="apply-loan__form__control">
+                                    <label for="status-email">Email Address*</label>
+                                    <input type="email" id="status-email" name="email" placeholder="Enter the email used on your application" required="">
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="submit" class="apply-loan__form__btn easilon-btn">
+                                    <span>check status</span>
+                                    <span class="easilon-btn__icon">
+                                        <i class="icon-double-right-arrow"></i>
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="apply-loan__status-result" aria-live="polite"></div>
+                    </div>
+                </form>
+            </div>
+        </section>
+
         <footer class="main-footer @@extraClassName">
             <div class="main-footer__bg" style="background-image: url(assets/images/shapes/footer-bg-1-1.png);"></div>
             <!-- /.main-footer__bg -->
@@ -599,6 +626,15 @@
                 return;
             }
 
+            function escapeHtml(value) {
+                return String(value || "")
+                    .replace(/&/g, "&amp;")
+                    .replace(/</g, "&lt;")
+                    .replace(/>/g, "&gt;")
+                    .replace(/"/g, "&quot;")
+                    .replace(/'/g, "&#039;");
+            }
+
             form.addEventListener("submit", function (event) {
                 event.preventDefault();
 
@@ -651,6 +687,61 @@
                     .finally(function () {
                         if (submitButton) {
                             submitButton.disabled = false;
+                        }
+                    });
+            });
+
+            var statusForm = document.getElementById("loan-status-form");
+            var statusResult = statusForm ? statusForm.querySelector(".apply-loan__status-result") : null;
+
+            if (!statusForm) {
+                return;
+            }
+
+            statusForm.addEventListener("submit", function (event) {
+                event.preventDefault();
+
+                var emailInput = statusForm.querySelector("input[name='email']");
+                var email = emailInput ? emailInput.value.trim() : "";
+
+                if (statusResult) {
+                    statusResult.textContent = "Checking your application status...";
+                }
+
+                fetch(statusForm.action + "?email=" + encodeURIComponent(email))
+                    .then(function (response) {
+                        return response.json().then(function (data) {
+                            if (!response.ok) {
+                                throw new Error(data.error || "Unable to check loan application status.");
+                            }
+
+                            return data;
+                        });
+                    })
+                    .then(function (data) {
+                        if (!statusResult) {
+                            return;
+                        }
+
+                        if (!data.applications || data.applications.length === 0) {
+                            statusResult.textContent = "No application was found for that email.";
+                            return;
+                        }
+
+                        statusResult.innerHTML = data.applications.map(function (application) {
+                            return [
+                                "<div>",
+                                "<strong>Status:</strong> " + escapeHtml(application.status),
+                                "<br><strong>Loan:</strong> " + escapeHtml(application.loanPurpose) + " for " + escapeHtml(application.loanAmount),
+                                application.message ? "<br><strong>Update:</strong> " + escapeHtml(application.message) : "",
+                                "<br><strong>Submitted:</strong> " + escapeHtml(application.submittedAt),
+                                "</div>"
+                            ].join("");
+                        }).join("<hr>");
+                    })
+                    .catch(function (error) {
+                        if (statusResult) {
+                            statusResult.textContent = error.message;
                         }
                     });
             });

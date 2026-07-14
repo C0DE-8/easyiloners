@@ -25,6 +25,7 @@ function requireAdminKey(req, res, next) {
   next();
 }
 
+// Debug endpoint for deployment checks. It redacts the bot token and reports webhook state.
 router.get("/debug", requireAdminKey, async (req, res) => {
   try {
     const telegram = await getTelegramDebug();
@@ -34,6 +35,7 @@ router.get("/debug", requireAdminKey, async (req, res) => {
   }
 });
 
+// Read the current Telegram webhook registration from Telegram.
 router.get("/webhook", requireAdminKey, async (req, res) => {
   try {
     const webhook = await getTelegramWebhookInfo();
@@ -43,6 +45,7 @@ router.get("/webhook", requireAdminKey, async (req, res) => {
   }
 });
 
+// Register the public webhook URL that Telegram should call.
 router.post("/webhook", requireAdminKey, async (req, res) => {
   const url = (req.body && req.body.url) || process.env.TELEGRAM_WEBHOOK_URL;
 
@@ -54,6 +57,7 @@ router.post("/webhook", requireAdminKey, async (req, res) => {
   }
 });
 
+// Remove the Telegram webhook and optionally drop pending updates.
 router.delete("/webhook", requireAdminKey, async (req, res) => {
   try {
     const result = await deleteTelegramWebhook();
@@ -63,6 +67,7 @@ router.delete("/webhook", requireAdminKey, async (req, res) => {
   }
 });
 
+// Telegram calls this route with bot updates when webhook mode is enabled.
 router.post("/webhook/update", async (req, res) => {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 

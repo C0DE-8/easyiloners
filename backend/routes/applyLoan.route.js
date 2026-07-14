@@ -52,6 +52,37 @@ function validateApplication(application) {
   return REQUIRED_FIELDS.filter((field) => !application[field]);
 }
 
+// Public status lookup used by borrowers on apply-loan.html.
+router.get("/status", async (req, res) => {
+  const email = typeof req.query.email === "string" ? req.query.email.trim() : "";
+
+  if (!email) {
+    return res.status(400).json({ ok: false, error: "Email is required" });
+  }
+
+  const rows = await db.query(
+    `SELECT
+      id,
+      loan_amount AS loanAmount,
+      loan_purpose AS loanPurpose,
+      loan_years AS loanYears,
+      full_name AS fullName,
+      email,
+      application_status AS status,
+      status_message AS message,
+      created_at AS submittedAt,
+      updated_at AS updatedAt
+    FROM loan_applications
+    WHERE LOWER(email) = LOWER(?)
+    ORDER BY created_at DESC
+    LIMIT 5`,
+    [email]
+  );
+
+  res.json({ ok: true, applications: rows });
+});
+
+// Accept the public loan application form, store it, then notify approved Telegram chats.
 router.post("/", async (req, res) => {
   const application = normalizeApplication(req.body || {});
   const missingFields = validateApplication(application);
