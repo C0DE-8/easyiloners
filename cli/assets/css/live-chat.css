@@ -84,12 +84,41 @@
 }
 
 .live-chat-widget__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   border: 0;
   border-radius: 6px;
   padding: 10px 14px;
   background: #0f766e;
   color: #fff;
   font-weight: 700;
+}
+
+.live-chat-widget__submit:disabled {
+  cursor: wait;
+  opacity: 0.82;
+}
+
+.live-chat-widget__submit-loader {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.45);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: liveChatButtonSpin 0.72s linear infinite;
+}
+
+.live-chat-widget__submit.is-loading .live-chat-widget__submit-loader {
+  display: inline-block;
+}
+
+@keyframes liveChatButtonSpin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .live-chat-widget__notice {

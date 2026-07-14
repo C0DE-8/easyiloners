@@ -385,7 +385,8 @@
                         </div><!-- /.pply-loan__form -->
                     </div><!-- /.apply-loan__details -->
                     <button type="submit" class="apply-loan__form__btn easilon-btn">
-                        <span>submit now</span>
+                        <span class="btn__label">submit now</span>
+                        <span class="btn__loader" aria-hidden="true"></span>
                         <span class="easilon-btn__icon">
                             <i class="icon-double-right-arrow"></i>
                         </span>
@@ -409,7 +410,8 @@
                             </div>
                             <div class="col-md-4">
                                 <button type="submit" class="apply-loan__form__btn easilon-btn">
-                                    <span>check status</span>
+                                    <span class="btn__label">check status</span>
+                                    <span class="btn__loader" aria-hidden="true"></span>
                                     <span class="easilon-btn__icon">
                                         <i class="icon-double-right-arrow"></i>
                                     </span>
@@ -627,6 +629,26 @@
                 message.textContent = messageText;
             }
 
+            function setButtonLoading(button, isLoading, loadingText) {
+                if (!button) {
+                    return;
+                }
+
+                var label = button.querySelector(".btn__label");
+
+                if (!button.dataset.defaultLabel && label) {
+                    button.dataset.defaultLabel = label.textContent;
+                }
+
+                button.disabled = isLoading;
+                button.classList.toggle("is-loading", isLoading);
+                button.setAttribute("aria-busy", isLoading ? "true" : "false");
+
+                if (label) {
+                    label.textContent = isLoading ? loadingText : button.dataset.defaultLabel;
+                }
+            }
+
             function escapeHtml(value) {
                 return String(value || "")
                     .replace(/&/g, "&amp;")
@@ -672,9 +694,7 @@
                     payload[key] = value;
                 });
 
-                if (submitButton) {
-                    submitButton.disabled = true;
-                }
+                setButtonLoading(submitButton, true, "submitting");
 
                 showFormAlert("Submitting your loan application...", "info");
 
@@ -690,9 +710,7 @@
                         showFormAlert(error.message, "danger");
                     })
                     .finally(function () {
-                        if (submitButton) {
-                            submitButton.disabled = false;
-                        }
+                        setButtonLoading(submitButton, false);
                     });
             });
 
@@ -762,7 +780,9 @@
 
                 var emailInput = statusForm.querySelector("input[name='email']");
                 var email = emailInput ? emailInput.value.trim() : "";
+                var statusButton = statusForm.querySelector("button[type='submit']");
 
+                setButtonLoading(statusButton, true, "checking");
                 showStatusAlert("Checking your application status...", "info");
 
                 window.easyilonersApi.getLoanStatus(email)
@@ -772,6 +792,9 @@
                     })
                     .catch(function (error) {
                         showStatusAlert(error.message, "danger");
+                    })
+                    .finally(function () {
+                        setButtonLoading(statusButton, false);
                     });
             });
         })();

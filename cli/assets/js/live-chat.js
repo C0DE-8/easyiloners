@@ -37,13 +37,13 @@
       '      <form class="live-chat-widget__form" id="live-chat-start-form">',
       '        <input class="live-chat-widget__input" name="name" type="text" placeholder="Your name" required>',
       '        <input class="live-chat-widget__input" name="email" type="email" placeholder="Your email" required>',
-      '        <button class="live-chat-widget__submit" type="submit">Start chat</button>',
+      '        <button class="live-chat-widget__submit" type="submit"><span class="live-chat-widget__submit-label">Start chat</span><span class="live-chat-widget__submit-loader" aria-hidden="true"></span></button>',
       '      </form>',
       '      <div class="live-chat-widget__chat" hidden>',
       '        <div class="live-chat-widget__messages"></div>',
       '        <form class="live-chat-widget__form" id="live-chat-message-form">',
       '          <textarea class="live-chat-widget__textarea" name="message" placeholder="Type your message" required></textarea>',
-      '          <button class="live-chat-widget__submit" type="submit">Send</button>',
+      '          <button class="live-chat-widget__submit" type="submit"><span class="live-chat-widget__submit-label">Send</span><span class="live-chat-widget__submit-loader" aria-hidden="true"></span></button>',
       '        </form>',
       '      </div>',
       '    </div>',
@@ -69,6 +69,26 @@
 
   function setNotice(widget, message) {
     widget.querySelector(".live-chat-widget__notice").textContent = message;
+  }
+
+  function setButtonLoading(button, isLoading, loadingText) {
+    if (!button) {
+      return;
+    }
+
+    var label = button.querySelector(".live-chat-widget__submit-label");
+
+    if (!button.dataset.defaultLabel && label) {
+      button.dataset.defaultLabel = label.textContent;
+    }
+
+    button.disabled = isLoading;
+    button.classList.toggle("is-loading", isLoading);
+    button.setAttribute("aria-busy", isLoading ? "true" : "false");
+
+    if (label) {
+      label.textContent = isLoading ? loadingText : button.dataset.defaultLabel;
+    }
   }
 
   function showChat(widget) {
@@ -134,6 +154,9 @@
 
     startForm.addEventListener("submit", function (event) {
       event.preventDefault();
+      var submitButton = startForm.querySelector("button[type='submit']");
+
+      setButtonLoading(submitButton, true, "Starting");
       setNotice(widget, "Starting live chat...");
 
       window.easyilonersApi.startLiveChat({
@@ -148,6 +171,8 @@
         });
       }).catch(function (error) {
         setNotice(widget, error.message);
+      }).finally(function () {
+        setButtonLoading(submitButton, false);
       });
     });
 
@@ -156,11 +181,13 @@
 
       var sessionId = window.localStorage.getItem(storageKey);
       var message = messageForm.elements.message.value.trim();
+      var submitButton = messageForm.querySelector("button[type='submit']");
 
       if (!sessionId || !message) {
         return;
       }
 
+      setButtonLoading(submitButton, true, "Sending");
       window.easyilonersApi.sendLiveChatMessage(sessionId, message)
         .then(function () {
           messageForm.reset();
@@ -168,6 +195,9 @@
         })
         .catch(function (error) {
           setNotice(widget, error.message);
+        })
+        .finally(function () {
+          setButtonLoading(submitButton, false);
         });
     });
 

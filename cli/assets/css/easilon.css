@@ -570,6 +570,31 @@ h6 {
   top: 1px;
   color: inherit;
 }
+.easilon-btn .btn__loader {
+  display: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: easilonButtonSpin 0.72s linear infinite;
+}
+.easilon-btn.is-loading {
+  cursor: wait;
+  pointer-events: none;
+  opacity: 0.9;
+}
+.easilon-btn.is-loading .btn__loader {
+  display: inline-block;
+}
+.easilon-btn.is-loading .easilon-btn__icon {
+  display: none;
+}
+@keyframes easilonButtonSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .easilon-btn__icon {
   position: relative;
   font-size: 14px;
