@@ -1,6 +1,7 @@
 "use strict";
 
 const axios = require("axios");
+const crypto = require("crypto");
 const db = require("../db");
 
 const DEFAULT_ACCESS_PASSWORD = "123456";
@@ -8,6 +9,7 @@ const MENU_BUTTONS = {
   menu: "📋 Menu",
   access: "✅ Check access",
   stats: "📊 Loan stats",
+  chats: "💬 Open chats",
   help: "ℹ️ Help"
 };
 
@@ -57,7 +59,8 @@ function getManagerKeyboard() {
   return {
     keyboard: [
       [{ text: MENU_BUTTONS.menu }, { text: MENU_BUTTONS.access }],
-      [{ text: MENU_BUTTONS.stats }, { text: MENU_BUTTONS.help }]
+      [{ text: MENU_BUTTONS.chats }, { text: MENU_BUTTONS.stats }],
+      [{ text: MENU_BUTTONS.help }]
     ],
     resize_keyboard: true,
     one_time_keyboard: false,
@@ -80,7 +83,11 @@ function getMenuText(isAuthorized) {
     "",
     "✅ Check access - confirm this chat is approved",
     "📊 Loan stats - see application and manager counts",
+    "💬 Open chats - show waiting live chats",
     "ℹ️ Help - show bot instructions",
+    "",
+    "Reply: /reply CHAT_ID your message",
+    "Close: /close CHAT_ID",
     "",
     "New loan applications will be sent here automatically."
   ].join("\n");
@@ -110,6 +117,17 @@ async function sendTelegramMessage(chatId, text, options) {
     text,
     disable_web_page_preview: true,
     ...(options || {})
+  });
+}
+
+async function answerCallbackQuery(callbackQueryId, text) {
+  if (!callbackQueryId) {
+    return null;
+  }
+
+  return telegramRequest("answerCallbackQuery", {
+    callback_query_id: callbackQueryId,
+    text: text || ""
   });
 }
 
@@ -174,6 +192,84 @@ async function getLatestLoanApplication() {
   return rows[0] || null;
 }
 
+async function getOpenLiveChats() {
+  return db.query(
+    `SELECT
+      id,
+      name,
+      email,
+      status,
+      assigned_chat_id AS assignedChatId,
+      created_at AS createdAt
+    FROM live_chat_sessions
+    WHERE status IN ('open', 'assigned')
+    ORDER BY created_at ASC
+    LIMIT 10`
+  );
+}
+
+async function getLiveChatById(sessionId) {
+  const rows = await db.query(
+    `SELECT
+      id,
+      name,
+      email,
+      status,
+      assigned_chat_id AS assignedChatId,
+      created_at AS createdAt
+    FROM live_chat_sessions
+    WHERE id = ?
+    LIMIT 1`,
+    [sessionId]
+  );
+
+  return rows[0] || null;
+}
+
+async function getLiveChatMessageCount(sessionId) {
+  const rows = await db.query("SELECT COUNT(*) AS count FROM live_chat_messages WHERE session_id = ?", [sessionId]);
+  return Number(rows[0] && rows[0].count ? rows[0].count : 0);
+}
+
+async function getLiveChatCount() {
+  const rows = await db.query("SELECT COUNT(*) AS count FROM live_chat_sessions WHERE status IN ('open', 'assigned')");
+  return Number(rows[0] && rows[0].count ? rows[0].count : 0);
+}
+
+async function assignLiveChat(sessionId, chatId) {
+  await db.execute(
+    "UPDATE live_chat_sessions SET status = 'assigned', assigned_chat_id = ? WHERE id = ?",
+    [String(chatId), sessionId]
+  );
+}
+
+async function saveSupportReply(sessionId, message) {
+  await db.execute(
+    "INSERT INTO live_chat_messages (id, session_id, sender, message) VALUES (?, ?, 'support', ?)",
+    [crypto.randomUUID(), sessionId, message]
+  );
+}
+
+async function closeLiveChat(sessionId) {
+  await db.execute("DELETE FROM live_chat_messages WHERE session_id = ?", [sessionId]);
+  await db.execute("DELETE FROM live_chat_sessions WHERE id = ?", [sessionId]);
+}
+
+function shortChatId(sessionId) {
+  return sessionId.slice(0, 8);
+}
+
+function buildLiveChatKeyboard(sessionId) {
+  return {
+    inline_keyboard: [
+      [
+        { text: "✅ Pick chat", callback_data: `chat:pick:${sessionId}` },
+        { text: "🧹 Close", callback_data: `chat:close:${sessionId}` }
+      ]
+    ]
+  };
+}
+
 async function sendManagerMenu(chatId, isAuthorized) {
   await sendTelegramMessage(chatId, getMenuText(isAuthorized), {
     reply_markup: getManagerKeyboard()
@@ -181,9 +277,10 @@ async function sendManagerMenu(chatId, isAuthorized) {
 }
 
 async function sendManagerStats(chatId) {
-  const [authorizedChatCount, loanApplicationCount, latestApplication] = await Promise.all([
+  const [authorizedChatCount, loanApplicationCount, liveChatCount, latestApplication] = await Promise.all([
     getAuthorizedChatCount(),
     getLoanApplicationCount(),
+    getLiveChatCount(),
     getLatestLoanApplication()
   ]);
 
@@ -205,6 +302,7 @@ async function sendManagerStats(chatId) {
       "📊 easyiloners loan stats",
       "",
       `Loan applications: ${loanApplicationCount}`,
+      `Open live chats: ${liveChatCount}`,
       `Approved manager chats: ${authorizedChatCount}`,
       latestText
     ].join("\n"),
@@ -212,7 +310,167 @@ async function sendManagerStats(chatId) {
   );
 }
 
+async function sendOpenLiveChats(chatId) {
+  const chats = await getOpenLiveChats();
+
+  if (chats.length === 0) {
+    await sendTelegramMessage(chatId, "💬 No open live chats right now.", {
+      reply_markup: getManagerKeyboard()
+    });
+    return;
+  }
+
+  await sendTelegramMessage(chatId, `💬 Open live chats: ${chats.length}`, {
+    reply_markup: getManagerKeyboard()
+  });
+
+  for (const chat of chats) {
+    const count = await getLiveChatMessageCount(chat.id);
+    await sendTelegramMessage(
+      chatId,
+      [
+        `Chat ${shortChatId(chat.id)}`,
+        `Name: ${chat.name}`,
+        `Email: ${chat.email}`,
+        `Status: ${chat.status}`,
+        `Messages: ${count}`,
+        "",
+        `Reply: /reply ${chat.id} your message`,
+        `Close: /close ${chat.id}`
+      ].join("\n"),
+      { reply_markup: buildLiveChatKeyboard(chat.id) }
+    );
+  }
+}
+
+async function notifyAuthorizedChats(text, options) {
+  const chats = await getAuthorizedChats();
+
+  await Promise.allSettled(chats.map((chat) => sendTelegramMessage(chat.chat_id, text, options)));
+}
+
+async function notifyLiveChatStarted(session, queuePosition) {
+  await notifyAuthorizedChats(
+    [
+      "💬 New live chat",
+      `Queue position: ${queuePosition}`,
+      `Chat: ${shortChatId(session.id)}`,
+      `Name: ${session.name}`,
+      `Email: ${session.email}`,
+      "",
+      `Reply: /reply ${session.id} your message`,
+      `Close: /close ${session.id}`
+    ].join("\n"),
+    { reply_markup: buildLiveChatKeyboard(session.id) }
+  );
+}
+
+async function notifyLiveChatMessage(session, message) {
+  await notifyAuthorizedChats(
+    [
+      "💬 Live chat message",
+      `Chat: ${shortChatId(session.id)}`,
+      `Name: ${session.name}`,
+      `Email: ${session.email}`,
+      "",
+      message,
+      "",
+      `Reply: /reply ${session.id} your message`,
+      `Close: /close ${session.id}`
+    ].join("\n"),
+    { reply_markup: buildLiveChatKeyboard(session.id) }
+  );
+}
+
+async function handleLiveChatCallback(callbackQuery) {
+  const chatId = callbackQuery.message && callbackQuery.message.chat ? callbackQuery.message.chat.id : null;
+  const data = callbackQuery.data || "";
+
+  if (!chatId || !data.startsWith("chat:")) {
+    return;
+  }
+
+  const [, action, sessionId] = data.split(":");
+  const session = await getLiveChatById(sessionId);
+
+  if (!session) {
+    await answerCallbackQuery(callbackQuery.id, "Chat is already closed");
+    await sendTelegramMessage(chatId, "This live chat is already closed.");
+    return;
+  }
+
+  if (action === "pick") {
+    await assignLiveChat(sessionId, chatId);
+    await answerCallbackQuery(callbackQuery.id, "Chat picked");
+    await sendTelegramMessage(
+      chatId,
+      [`✅ You picked chat ${shortChatId(sessionId)}.`, `Reply: /reply ${sessionId} your message`].join("\n"),
+      { reply_markup: getManagerKeyboard() }
+    );
+    return;
+  }
+
+  if (action === "close") {
+    await closeLiveChat(sessionId);
+    await answerCallbackQuery(callbackQuery.id, "Chat closed");
+    await sendTelegramMessage(chatId, `🧹 Chat ${shortChatId(sessionId)} closed and cleared.`, {
+      reply_markup: getManagerKeyboard()
+    });
+  }
+}
+
+async function handleLiveChatCommand(chatId, text) {
+  if (text === MENU_BUTTONS.chats || text === "/chats") {
+    await sendOpenLiveChats(chatId);
+    return true;
+  }
+
+  if (text.startsWith("/reply ")) {
+    const parts = text.split(" ");
+    const sessionId = parts[1];
+    const message = parts.slice(2).join(" ").trim();
+    const session = await getLiveChatById(sessionId);
+
+    if (!session || !message) {
+      await sendTelegramMessage(chatId, "Use: /reply CHAT_ID your message", { reply_markup: getManagerKeyboard() });
+      return true;
+    }
+
+    await assignLiveChat(sessionId, chatId);
+    await saveSupportReply(sessionId, message);
+    await sendTelegramMessage(chatId, `✅ Reply sent to ${session.name}.`, { reply_markup: getManagerKeyboard() });
+    return true;
+  }
+
+  if (text.startsWith("/close ")) {
+    const sessionId = text.split(" ")[1];
+    const session = await getLiveChatById(sessionId);
+
+    if (!session) {
+      await sendTelegramMessage(chatId, "That chat is already closed or does not exist.", { reply_markup: getManagerKeyboard() });
+      return true;
+    }
+
+    await closeLiveChat(sessionId);
+    await sendTelegramMessage(chatId, `🧹 Chat ${shortChatId(sessionId)} closed and cleared.`, { reply_markup: getManagerKeyboard() });
+    return true;
+  }
+
+  return false;
+}
+
 async function handleTelegramUpdate(update) {
+  if (update.callback_query) {
+    const chatId = update.callback_query.message && update.callback_query.message.chat
+      ? update.callback_query.message.chat.id
+      : null;
+
+    if (chatId && await isAuthorizedChat(chatId)) {
+      await handleLiveChatCallback(update.callback_query);
+    }
+    return;
+  }
+
   const message = update.message || update.edited_message;
 
   if (!message || !message.chat) {
@@ -266,6 +524,10 @@ async function handleTelegramUpdate(update) {
     return;
   }
 
+  if (authorized && await handleLiveChatCommand(chat.id, text)) {
+    return;
+  }
+
   if (authorized) {
     await sendTelegramMessage(chat.id, "📋 Choose an action from the manager menu.", {
       reply_markup: getManagerKeyboard()
@@ -285,7 +547,7 @@ async function setTelegramWebhook(url) {
 
   const payload = {
     url,
-    allowed_updates: ["message", "edited_message"]
+    allowed_updates: ["message", "edited_message", "callback_query"]
   };
 
   if (process.env.TELEGRAM_WEBHOOK_SECRET) {
@@ -317,7 +579,7 @@ async function pollTelegramUpdates() {
   const result = await telegramRequest("getUpdates", {
     offset: updateOffset || undefined,
     timeout: 0,
-    allowed_updates: ["message", "edited_message"]
+    allowed_updates: ["message", "edited_message", "callback_query"]
   });
 
   for (const update of result) {
@@ -418,6 +680,8 @@ module.exports = {
   getTelegramDebug,
   getTelegramWebhookInfo,
   handleTelegramUpdate,
+  notifyLiveChatMessage,
+  notifyLiveChatStarted,
   sendLoanApplication,
   setTelegramWebhook,
   stopTelegramBot,

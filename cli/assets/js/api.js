@@ -42,6 +42,29 @@
       }).catch(function (error) {
         throw new Error(getErrorMessage(error, "Unable to load loan applications."));
       });
+    },
+    startLiveChat: function (payload) {
+      return api.post("/api/live-chat/start", payload).then(function (response) {
+        return response.data;
+      }).catch(function (error) {
+        throw new Error(getErrorMessage(error, "Unable to start live chat."));
+      });
+    },
+    getLiveChat: function (sessionId) {
+      return api.get("/api/live-chat/" + encodeURIComponent(sessionId)).then(function (response) {
+        return response.data;
+      }).catch(function (error) {
+        throw new Error(getErrorMessage(error, "Unable to load live chat."));
+      });
+    },
+    sendLiveChatMessage: function (sessionId, message) {
+      return api.post("/api/live-chat/" + encodeURIComponent(sessionId) + "/messages", {
+        message: message
+      }).then(function (response) {
+        return response.data;
+      }).catch(function (error) {
+        throw new Error(getErrorMessage(error, "Unable to send live chat message."));
+      });
     }
   };
 })(window);

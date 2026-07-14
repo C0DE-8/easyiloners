@@ -4,6 +4,7 @@ const express = require("express");
 const helmet = require("helmet");
 const db = require("./db");
 const applyLoanRouter = require("./routes/applyLoan.route");
+const liveChatRouter = require("./routes/liveChat.route");
 const telegramRouter = require("./routes/telegram.route");
 
 const app = express();
@@ -40,6 +41,7 @@ app.get("/health", async (req, res) => {
 });
 
 app.use("/api/apply-loan", applyLoanRouter);
+app.use("/api/live-chat", liveChatRouter);
 app.use("/api/telegram", telegramRouter);
 
 module.exports = app;

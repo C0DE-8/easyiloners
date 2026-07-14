@@ -82,6 +82,45 @@ curl "http://localhost:3000/api/apply-loan/status?email=jane@example.com"
 curl "http://localhost:3000/api/apply-loan/all?limit=25"
 ```
 
+### Live Chat
+
+Start a chat:
+
+```bash
+curl -X POST http://localhost:3000/api/live-chat/start \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "Jane Borrower",
+    "email": "jane@example.com"
+  }'
+```
+
+Send a user message:
+
+```bash
+curl -X POST http://localhost:3000/api/live-chat/CHAT_SESSION_ID/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "I need help with my loan application."
+  }'
+```
+
+Load chat messages:
+
+```bash
+curl http://localhost:3000/api/live-chat/CHAT_SESSION_ID
+```
+
+Support managers reply in Telegram:
+
+```text
+/chats
+/reply CHAT_SESSION_ID your message
+/close CHAT_SESSION_ID
+```
+
+Closing a chat deletes that live chat session and its messages from the database.
+
 ### Telegram Bot Access
 
 Start the backend, open the Telegram bot, send `/start`, then send:
@@ -96,6 +135,7 @@ After access is approved, the bot shows a manager menu with:
 
 - `📋 Menu` - show manager actions
 - `✅ Check access` - confirm this chat is approved
+- `💬 Open chats` - show waiting live chats
 - `📊 Loan stats` - show application count, manager chat count, and latest application
 - `ℹ️ Help` - show instructions
 
@@ -104,6 +144,7 @@ The same actions also work as commands:
 ```text
 /menu
 /access
+/chats
 /stats
 /help
 ```
