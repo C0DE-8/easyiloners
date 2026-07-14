@@ -74,14 +74,6 @@ curl -X POST http://localhost:3000/api/apply-loan \
 curl "http://localhost:3000/api/apply-loan/status?email=jane@example.com"
 ```
 
-### View Recent Loans
-
-`GET /api/apply-loan/all?limit=25`
-
-```bash
-curl "http://localhost:3000/api/apply-loan/all?limit=25"
-```
-
 ### Live Chat
 
 Start a chat:
@@ -115,6 +107,7 @@ Support managers reply in Telegram:
 
 ```text
 /chats
+/loans
 /reply CHAT_SESSION_ID your message
 /close CHAT_SESSION_ID
 ```
@@ -135,6 +128,7 @@ After access is approved, the bot shows a manager menu with:
 
 - `📋 Menu` - show manager actions
 - `✅ Check access` - confirm this chat is approved
+- `📄 View all loans` - show recent loan applications in Telegram
 - `💬 Open chats` - show waiting live chats
 - `📊 Loan stats` - show application count, manager chat count, and latest application
 - `ℹ️ Help` - show instructions
@@ -144,6 +138,7 @@ The same actions also work as commands:
 ```text
 /menu
 /access
+/loans
 /chats
 /stats
 /help

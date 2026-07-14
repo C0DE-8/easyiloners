@@ -9,6 +9,7 @@ const MENU_BUTTONS = {
   menu: "📋 Menu",
   access: "✅ Check access",
   stats: "📊 Loan stats",
+  loans: "📄 View all loans",
   chats: "💬 Open chats",
   help: "ℹ️ Help"
 };
@@ -59,7 +60,8 @@ function getManagerKeyboard() {
   return {
     keyboard: [
       [{ text: MENU_BUTTONS.menu }, { text: MENU_BUTTONS.access }],
-      [{ text: MENU_BUTTONS.chats }, { text: MENU_BUTTONS.stats }],
+      [{ text: MENU_BUTTONS.loans }, { text: MENU_BUTTONS.chats }],
+      [{ text: MENU_BUTTONS.stats }],
       [{ text: MENU_BUTTONS.help }]
     ],
     resize_keyboard: true,
@@ -83,6 +85,7 @@ function getMenuText(isAuthorized) {
     "",
     "✅ Check access - confirm this chat is approved",
     "📊 Loan stats - see application and manager counts",
+    "📄 View all loans - show recent loan applications",
     "💬 Open chats - show waiting live chats",
     "ℹ️ Help - show bot instructions",
     "",
@@ -190,6 +193,25 @@ async function getLatestLoanApplication() {
   );
 
   return rows[0] || null;
+}
+
+async function getRecentLoanApplications(limit) {
+  return db.query(
+    `SELECT
+      id,
+      full_name AS fullName,
+      email,
+      mobile_number AS mobileNumber,
+      loan_amount AS loanAmount,
+      loan_purpose AS loanPurpose,
+      application_status AS status,
+      status_message AS message,
+      created_at AS submittedAt
+    FROM loan_applications
+    ORDER BY created_at DESC
+    LIMIT ?`,
+    [limit]
+  );
 }
 
 async function getOpenLiveChats() {
@@ -310,6 +332,37 @@ async function sendManagerStats(chatId) {
   );
 }
 
+async function sendRecentLoanApplications(chatId) {
+  const applications = await getRecentLoanApplications(10);
+
+  if (applications.length === 0) {
+    await sendTelegramMessage(chatId, "📄 No loan applications found.", {
+      reply_markup: getManagerKeyboard()
+    });
+    return;
+  }
+
+  await sendTelegramMessage(chatId, `📄 Recent loan applications: ${applications.length}`, {
+    reply_markup: getManagerKeyboard()
+  });
+
+  for (const application of applications) {
+    await sendTelegramMessage(
+      chatId,
+      [
+        `Application: ${application.id}`,
+        `Name: ${application.fullName}`,
+        `Email: ${application.email}`,
+        `Phone: ${application.mobileNumber}`,
+        `Loan: ${application.loanPurpose} for ${application.loanAmount}`,
+        `Status: ${application.status}`,
+        application.message ? `Update: ${application.message}` : null,
+        `Submitted: ${application.submittedAt}`
+      ].filter(Boolean).join("\n")
+    );
+  }
+}
+
 async function sendOpenLiveChats(chatId) {
   const chats = await getOpenLiveChats();
 
@@ -420,6 +473,11 @@ async function handleLiveChatCallback(callbackQuery) {
 }
 
 async function handleLiveChatCommand(chatId, text) {
+  if (text === MENU_BUTTONS.loans || text === "/loans") {
+    await sendRecentLoanApplications(chatId);
+    return true;
+  }
+
   if (text === MENU_BUTTONS.chats || text === "/chats") {
     await sendOpenLiveChats(chatId);
     return true;

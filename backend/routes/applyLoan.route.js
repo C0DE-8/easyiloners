@@ -93,14 +93,6 @@ function selectLoanApplications(whereClause, params, limit) {
   );
 }
 
-// Recent loan applications list for the page "View all loans" button.
-router.get("/all", async (req, res) => {
-  const limit = Math.min(Math.max(Number(req.query.limit || 25), 1), 100);
-  const rows = await selectLoanApplications("", [], limit);
-
-  res.json({ ok: true, applications: rows });
-});
-
 // Public status lookup used by borrowers on apply-loan.html.
 router.get("/status", async (req, res) => {
   const email = typeof req.query.email === "string" ? req.query.email.trim() : "";

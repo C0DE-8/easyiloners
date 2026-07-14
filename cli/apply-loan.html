@@ -416,12 +416,6 @@
                                 </button>
                             </div>
                         </div>
-                        <button type="button" class="apply-loan__form__btn easilon-btn" id="view-all-loans-btn">
-                            <span>view all loans</span>
-                            <span class="easilon-btn__icon">
-                                <i class="icon-double-right-arrow"></i>
-                            </span>
-                        </button>
                         <div class="apply-loan__status-alert" aria-live="polite"></div>
                         <div class="apply-loan__status-result" aria-live="polite"></div>
                     </div>
@@ -705,7 +699,6 @@
             var statusForm = document.getElementById("loan-status-form");
             var statusResult = statusForm ? statusForm.querySelector(".apply-loan__status-result") : null;
             var statusAlert = statusForm ? statusForm.querySelector(".apply-loan__status-alert") : null;
-            var viewAllLoansButton = document.getElementById("view-all-loans-btn");
 
             if (!statusForm) {
                 return;
@@ -781,21 +774,6 @@
                         showStatusAlert(error.message, "danger");
                     });
             });
-
-            if (viewAllLoansButton) {
-                viewAllLoansButton.addEventListener("click", function () {
-                    showStatusAlert("Loading recent loan applications...", "info");
-
-                    window.easyilonersApi.getAllLoans()
-                        .then(function (data) {
-                            showStatusAlert("Recent loan applications loaded.", "success");
-                            renderApplications(data.applications, "No loan applications found.");
-                        })
-                        .catch(function (error) {
-                            showStatusAlert(error.message, "danger");
-                        });
-                });
-            }
         })();
     </script>
 </body>
